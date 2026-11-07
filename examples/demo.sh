@@ -5,7 +5,23 @@ out_dir="${TMPDIR:-/tmp}/promptguard-demo-$$"
 mkdir -p "$out_dir"
 python3 -m promptguard scan examples/prompts/safe.md --json "$out_dir/safe.json" --html "$out_dir/safe.html" --sarif "$out_dir/safe.sarif" --junit "$out_dir/safe.xml" --markdown "$out_dir/safe.md" --fail-on medium
 python3 -m promptguard scan examples/prompts/risky.md --json "$out_dir/risky.json" --html "$out_dir/risky.html" --sarif "$out_dir/risky.sarif" --junit "$out_dir/risky.xml" --markdown "$out_dir/risky.md"
-python3 -m promptguard scan examples/prompts/tokens.md --json "$out_dir/tokens.json" --markdown "$out_dir/tokens-summary.md"
+GH_TOKEN="ghp_EXAMPLE1234567890""EXAMPLE1234567890abcd"
+SLACK_TOKEN="xoxb-123456""789012-abcdefghijklmnop"
+GOOGLE_KEY="AIzaSyEXAMPLE1234567890""EXAMPLE123456789"
+JWT_TOKEN="eyJhbGciOiJIUzI1NiJ9.""eyJzdWIiOiIxMjM0NTY3ODkwIn0.""SflKxwRJSMeKKF2QT4""fwpMeJf36POk6yJVadQssw5c"
+cat > "$out_dir/tokens.md" <<FIXTURE
+---
+name: leaked-tokens-example
+description: fixture with recognizable token formats for scanner demos
+version: 0.1.0
+---
+
+The leaked GitHub credential $GH_TOKEN appeared in a shared log line.
+A stale Slack bot token $SLACK_TOKEN was committed last week.
+The demo Google API key $GOOGLE_KEY is still active.
+An old session JWT $JWT_TOKEN was pasted into a ticket.
+FIXTURE
+python3 -m promptguard scan "$out_dir/tokens.md" --json "$out_dir/tokens.json" --markdown "$out_dir/tokens-summary.md"
 python3 -m json.tool "$out_dir/safe.sarif" >/dev/null
 python3 -m json.tool "$out_dir/risky.sarif" >/dev/null
 python3 - <<PY
