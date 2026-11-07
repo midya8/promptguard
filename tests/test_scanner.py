@@ -127,3 +127,51 @@ class ScannerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TokenRuleTests(unittest.TestCase):
+    def test_github_token_is_critical_and_redacted(self):
+        items = findings("Leaked ghp_EXAMPLE1234567890EXAMPLE1234567890abcd in a log.\n")
+        finding = next(item for item in items if item.rule_id == "SECRET_GITHUB_TOKEN")
+        self.assertEqual("critical", finding.severity)
+        self.assertIn("ghp_EXAM...REDACTED", finding.excerpt)
+        self.assertNotIn("EXAMPLE1234567890EXAMPLE", finding.excerpt)
+
+    def test_github_fine_grained_pat_is_critical(self):
+        items = findings("Token github_pat_11ABCDEFG0EXAMPLE1234567890_example in CI config.\n")
+        self.assertIn("SECRET_GITHUB_TOKEN", {item.rule_id for item in items})
+
+    def test_slack_token_is_critical_and_redacted(self):
+        items = findings("Bot token xoxb-123456789012-abcdefghijklmnop posted in chat.\n")
+        finding = next(item for item in items if item.rule_id == "SECRET_SLACK_TOKEN")
+        self.assertEqual("critical", finding.severity)
+        self.assertIn("xoxb-123...REDACTED", finding.excerpt)
+        self.assertNotIn("abcdefghijklmnop", finding.excerpt)
+
+    def test_google_api_key_is_critical_and_redacted(self):
+        items = findings("Key AIzaSyEXAMPLE1234567890EXAMPLE123456789 still works.\n")
+        finding = next(item for item in items if item.rule_id == "SECRET_GOOGLE_KEY")
+        self.assertEqual("critical", finding.severity)
+        self.assertIn("AIzaSyE...REDACTED", finding.excerpt)
+
+    def test_jwt_is_high_and_redacted(self):
+        items = findings("JWT eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJVadQssw5c in a ticket.\n")
+        finding = next(item for item in items if item.rule_id == "SECRET_JWT")
+        self.assertEqual("high", finding.severity)
+        self.assertIn("eyJhbGciOiJI...REDACTED", finding.excerpt)
+        self.assertNotIn("SflKxwRJSMeKKF2QT4", finding.excerpt)
+
+    def test_short_lookalikes_are_not_flagged(self):
+        items = findings("Values ghp_short, xoxb-123 and eyJhbGciOiJIUzI1NiJ9 alone are not tokens.\n")
+        rule_ids = {item.rule_id for item in items}
+        self.assertNotIn("SECRET_GITHUB_TOKEN", rule_ids)
+        self.assertNotIn("SECRET_SLACK_TOKEN", rule_ids)
+        self.assertNotIn("SECRET_JWT", rule_ids)
+
+    def test_tokens_fixture_yields_exact_rule_set(self):
+        result = scan_paths(["examples/prompts/tokens.md"])
+        self.assertEqual(
+            {"SECRET_GITHUB_TOKEN", "SECRET_SLACK_TOKEN", "SECRET_GOOGLE_KEY", "SECRET_JWT"},
+            {item.rule_id for item in result.findings},
+        )
+        self.assertEqual((), result.errors)
