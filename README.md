@@ -2,7 +2,7 @@
 
 Local-first prompt, secret and prompt-injection linting for AI systems.
 
-PromptGuard scans prompt, Markdown, JSON and YAML files for credential material, personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON, SARIF 2.1.0 output for code-scanning tools, JUnit XML for CI test viewers, Markdown reports for CI job summaries, and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.
+PromptGuard scans prompt, Markdown, JSON and YAML files for credential material (including OpenAI, AWS, GitHub, Slack and Google tokens and JWTs), personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON, SARIF 2.1.0 output for code-scanning tools, JUnit XML for CI test viewers, Markdown reports for CI job summaries, and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.
 
 ## Why
 
@@ -51,7 +51,8 @@ python3 -m promptguard scan prompts/ --min-severity medium --max-findings 20
 | Rule family | Severity | What it catches |
 | --- | --- | --- |
 | Secret assignment | high | `api_key`, `token`, `password` or `secret` assigned to credential-like values |
-| OpenAI/AWS/private keys | critical | recognizable API key and private key material |
+| OpenAI/AWS/GitHub/Slack/Google keys and private keys | critical | recognizable API key, access token and private key material |
+| JSON Web Tokens | high | signed JWT credentials embedded in prompts or configs |
 | PII | low to critical | emails, phone numbers and payment-card numbers validated with Luhn |
 | Prompt injection | high | ignore-instructions, reveal-system-prompt, bypass-control and exfiltration language |
 | Role confusion | high | unrestricted, jailbroken or privileged-role framing |

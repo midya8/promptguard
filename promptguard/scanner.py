@@ -18,6 +18,17 @@ PRIVATE_KEY = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY----
 EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 PHONE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]\d{3}[\s.-]\d{4}(?!\d)")
 CARD = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
+GITHUB_TOKEN = re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b|\bgithub_pat_[A-Za-z0-9_]{22,}\b")
+SLACK_TOKEN = re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")
+GOOGLE_KEY = re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")
+JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\b")
+
+TOKEN_RULES = (
+    ("SECRET_GITHUB_TOKEN", GITHUB_TOKEN, "critical", "GitHub token material found"),
+    ("SECRET_SLACK_TOKEN", SLACK_TOKEN, "critical", "Slack token material found"),
+    ("SECRET_GOOGLE_KEY", GOOGLE_KEY, "critical", "Google API key material found"),
+    ("SECRET_JWT", JWT, "high", "JSON Web Token material found"),
+)
 
 INJECTION_RULES = (
     ("INJECTION_IGNORE", re.compile(r"(?i)\b(?:ignore|disregard|forget)\b[^\n]{0,40}\b(?:previous|above|prior)\b[^\n]{0,30}\binstructions\b"), "prompt tells the model to ignore earlier instructions"),
@@ -35,6 +46,10 @@ def _line_excerpt(text: str) -> str:
 def _redact(text: str) -> str:
     text = OPENAI_KEY.sub(lambda m: m.group(0)[:7] + "...REDACTED", text)
     text = AWS_KEY.sub(lambda m: m.group(0)[:4] + "...REDACTED", text)
+    text = GITHUB_TOKEN.sub(lambda m: m.group(0)[:8] + "...REDACTED", text)
+    text = SLACK_TOKEN.sub(lambda m: m.group(0)[:8] + "...REDACTED", text)
+    text = GOOGLE_KEY.sub(lambda m: m.group(0)[:7] + "...REDACTED", text)
+    text = JWT.sub(lambda m: m.group(0)[:12] + "...REDACTED", text)
     text = SECRET_ASSIGNMENT.sub(lambda m: f"{m.group(1)}=<redacted>", text)
     text = EMAIL.sub("<email>", text)
     text = PHONE.sub("<phone>", text)
@@ -94,6 +109,9 @@ def scan_text(path: Path, text: str) -> tuple[Finding, ...]:
             findings.append(Finding("SECRET_AWS_KEY", "critical", display, number, "AWS-style access key material found", excerpt))
         if PRIVATE_KEY.search(line):
             findings.append(Finding("SECRET_PRIVATE_KEY", "critical", display, number, "private key material found", excerpt))
+        for rule_id, pattern, severity, message in TOKEN_RULES:
+            if pattern.search(line):
+                findings.append(Finding(rule_id, severity, display, number, message, excerpt))
         if EMAIL.search(line):
             findings.append(Finding("PII_EMAIL", "medium", display, number, "email address found", excerpt))
         if PHONE.search(line):
