@@ -7,7 +7,7 @@ import sys
 
 from .models import SEVERITY_ORDER
 from . import __version__
-from .report import render_report, render_sarif
+from .report import render_junit, render_report, render_sarif
 from .scanner import scan_paths
 
 
@@ -20,6 +20,8 @@ def cmd_scan(args) -> int:
         Path(args.html).write_text(render_report(result), encoding="utf-8")
     if args.sarif:
         Path(args.sarif).write_text(render_sarif(result, version=__version__), encoding="utf-8")
+    if args.junit:
+        Path(args.junit).write_text(render_junit(result), encoding="utf-8")
     print(f"scanned {result.files_scanned} file(s), {len(result.findings)} finding(s), max severity {result.max_severity or 'none'}")
     for finding in result.findings:
         print(f"{finding.severity.upper()} {finding.rule_id} {finding.path}:{finding.line} {finding.message} :: {finding.excerpt}")
@@ -45,6 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--json", help="write machine-readable JSON report")
     scan.add_argument("--html", help="write standalone escaped HTML report")
     scan.add_argument("--sarif", help="write SARIF 2.1.0 report for code-scanning tools")
+    scan.add_argument("--junit", help="write JUnit XML report for CI test viewers")
     scan.set_defaults(func=cmd_scan)
     return parser
 
