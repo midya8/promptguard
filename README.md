@@ -2,7 +2,7 @@
 
 Local-first prompt, secret and prompt-injection linting for AI systems.
 
-PromptGuard scans prompt, Markdown, JSON and YAML files for credential material, personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.
+PromptGuard scans prompt, Markdown, JSON and YAML files for credential material, personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON, SARIF 2.1.0 output for code-scanning tools, and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.
 
 ## Why
 
@@ -12,7 +12,7 @@ Prompt files are production configuration. They often mix instructions, examples
 - finds email addresses, phone numbers and payment-card numbers with Luhn validation;
 - finds prompt-injection language that asks a model to ignore prior instructions, reveal hidden prompts, bypass controls or exfiltrate secrets;
 - checks prompt metadata frontmatter for `name`, `description` and `version`;
-- redacts secrets and contact details in terminal, JSON and HTML findings;
+- redacts secrets and contact details in terminal, JSON, SARIF and HTML findings;
 - fails CI on a selected severity or finding-count threshold.
 
 ## Commands
@@ -23,12 +23,13 @@ Scan one file or a directory:
 python3 -m promptguard scan examples/prompts
 ```
 
-Write JSON and HTML reports:
+Write JSON, SARIF and HTML reports:
 
 ```bash
 python3 -m promptguard scan examples/prompts/risky.md \
   --json findings.json \
-  --html report.html
+  --html report.html \
+  --sarif findings.sarif
 ```
 
 Fail CI on high-severity findings:
@@ -79,6 +80,6 @@ The test suite runs fully offline. CI runs the same checks on Python 3.10 throug
 
 - **Local by default:** scanning uses only the filesystem and standard library.
 - **Redaction by default:** findings preserve enough context for review without copying full credentials into reports.
-- **Actionable output:** every finding carries a rule ID, severity, file, line, message and redacted excerpt.
+- **Actionable output:** every finding carries a rule ID, severity, file, line, message and redacted excerpt; SARIF output maps those findings to rule metadata, severity levels, source locations and redacted snippets for code-scanning tools.
 - **Scriptable gates:** severity and finding-count thresholds provide meaningful CI exit codes.
 - **Safe reports:** HTML output escapes file paths, messages and excerpts and needs no JavaScript.
