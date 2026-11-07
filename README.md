@@ -46,6 +46,20 @@ Limit output to medium or higher and cap total findings:
 python3 -m promptguard scan prompts/ --min-severity medium --max-findings 20
 ```
 
+Record known findings as a baseline, then gate only on new ones:
+
+```bash
+python3 -m promptguard scan prompts/ --write-baseline .promptguard-baseline.json
+python3 -m promptguard scan prompts/ --baseline .promptguard-baseline.json --fail-on high
+```
+
+Baselines store per-finding SHA-256 fingerprints built from the rule, path,
+message and already-redacted excerpt, so the file contains no credential
+material and a finding keeps its identity when unrelated lines shift above it.
+Suppressed findings stay out of reports and gate decisions; the JSON payload
+and Markdown summary report the suppressed count, and a malformed baseline
+fails closed with exit code 2.
+
 ## Rules
 
 | Rule family | Severity | What it catches |
