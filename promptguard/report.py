@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from html import escape
+import json
+from typing import Any
 
-from .models import ScanResult
+from .models import Finding, ScanResult
 
 _STYLES = """
 body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:40px;background:#f6f8fb;color:#182230}
@@ -35,3 +37,75 @@ def render_report(result: ScanResult) -> str:
 {errors_html}
 </main></body></html>
 """
+
+_SARIF_LEVELS = {
+    "critical": "error",
+    "high": "error",
+    "medium": "warning",
+    "low": "note",
+    "info": "note",
+}
+
+
+def _sarif_rule(finding: Finding) -> dict[str, Any]:
+    return {
+        "id": finding.rule_id,
+        "name": finding.rule_id.replace("_", " ").title().replace(" ", ""),
+        "shortDescription": {"text": finding.message},
+        "defaultConfiguration": {"level": _SARIF_LEVELS[finding.severity]},
+        "properties": {"promptguard_severity": finding.severity},
+    }
+
+
+def render_sarif(result: ScanResult, *, version: str) -> str:
+    """Render findings as SARIF 2.1.0 for code-scanning integrations."""
+    rules: dict[str, dict[str, Any]] = {}
+    results: list[dict[str, Any]] = []
+    for finding in result.findings:
+        rules.setdefault(finding.rule_id, _sarif_rule(finding))
+        results.append(
+            {
+                "ruleId": finding.rule_id,
+                "level": _SARIF_LEVELS[finding.severity],
+                "message": {"text": f"{finding.message} ({finding.severity})"},
+                "locations": [
+                    {
+                        "physicalLocation": {
+                            "artifactLocation": {"uri": finding.path.replace("\\", "/")},
+                            "region": {
+                                "startLine": finding.line,
+                                "snippet": {"text": finding.excerpt},
+                            },
+                        }
+                    }
+                ],
+            }
+        )
+    notifications = [
+        {"level": "warning", "message": {"text": error}}
+        for error in result.errors
+    ]
+    payload = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "PromptGuard",
+                        "version": version,
+                        "informationUri": "https://github.com/midya8/promptguard",
+                        "rules": [rules[key] for key in sorted(rules)],
+                    }
+                },
+                "results": results,
+                "invocations": [
+                    {
+                        "executionSuccessful": not result.errors,
+                        "toolExecutionNotifications": notifications,
+                    }
+                ],
+            }
+        ],
+    }
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
