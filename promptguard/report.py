@@ -165,3 +165,57 @@ def render_sarif(result: ScanResult, *, version: str) -> str:
         ],
     }
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def _md_cell(value: object) -> str:
+    """Escape a value for a GitHub-flavoured Markdown table cell."""
+    text = str(value)
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def render_markdown(result: ScanResult) -> str:
+    """Render findings as a Markdown report suited to CI job summaries."""
+    payload = result.to_dict()
+    counts = payload["severity_counts"]
+    lines = [
+        "# PromptGuard scan",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Files scanned | {payload['files_scanned']} |",
+        f"| Findings | {payload['finding_count']} |",
+        f"| Max severity | {_md_cell(payload['max_severity'] or 'none')} |",
+        f"| Scan errors | {len(result.errors)} |",
+        "",
+        "## Severity counts",
+        "",
+        "| Severity | Findings |",
+        "|---|---|",
+    ]
+    for severity in ("critical", "high", "medium", "low", "info"):
+        lines.append(f"| {severity} | {counts[severity]} |")
+    lines.extend(["", "## Findings", ""])
+    if result.findings:
+        lines.extend(
+            [
+                "| Severity | Rule | Location | Message | Excerpt |",
+                "|---|---|---|---|---|",
+            ]
+        )
+        for finding in result.findings:
+            lines.append(
+                "| {severity} | {rule} | {location} | {message} | {excerpt} |".format(
+                    severity=_md_cell(finding.severity),
+                    rule=_md_cell(finding.rule_id),
+                    location=_md_cell(f"{finding.path}:{finding.line}"),
+                    message=_md_cell(finding.message),
+                    excerpt=_md_cell(finding.excerpt),
+                )
+            )
+    else:
+        lines.append("No findings at the selected severity threshold.")
+    if result.errors:
+        lines.extend(["", "## Scan errors", ""])
+        for error in result.errors:
+            lines.append(f"- {_md_cell(error)}")
+    return "\n".join(lines) + "\n"
