@@ -50,6 +50,25 @@ tokens_md = open("$out_dir/tokens-summary.md", encoding="utf-8").read()
 assert "| Findings | 4 |" in tokens_md
 assert "SECRET_JWT" in tokens_md
 PY
+BASELINE="$out_dir/baseline.json"
+python3 -m promptguard scan examples/prompts/risky.md --write-baseline "$BASELINE" >/dev/null
+python3 -m promptguard scan examples/prompts/risky.md --baseline "$BASELINE" --json "$out_dir/risky-baselined.json" --markdown "$out_dir/risky-baselined.md" --fail-on high >/dev/null
+if grep -Eq 'AKIA|sk-[A-Za-z0-9]|xox|ghp_|AIza|eyJ' "$BASELINE"; then
+  echo "baseline file leaked credential material" >&2
+  exit 1
+fi
+if python3 -m promptguard scan "$out_dir/tokens.md" --baseline "$BASELINE" --fail-on high >/dev/null 2>&1; then
+  echo "expected new token findings to fail the gate despite the baseline" >&2
+  exit 1
+fi
+python3 - <<PY
+import json
+baselined = json.load(open("$out_dir/risky-baselined.json", encoding="utf-8"))
+assert baselined["finding_count"] == 0
+assert baselined["suppressed_count"] == 8
+bl_md = open("$out_dir/risky-baselined.md", encoding="utf-8").read()
+assert "| Suppressed by baseline | 8 |" in bl_md
+PY
 if python3 -m promptguard scan examples/prompts/risky.md --fail-on high >"$out_dir/gate.txt" 2>&1; then
   echo "expected risky prompt gate to fail" >&2
   exit 1
