@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -37,6 +38,10 @@ INJECTION_RULES = (
     ("INJECTION_EXFILTRATE", re.compile(r"(?i)\b(?:exfiltrate|steal|upload|send)\b[^\n]{0,50}\b(?:api[_ -]?keys?|secrets?|passwords?|credentials?|private data)\b"), "prompt asks to exfiltrate credentials or private data"),
     ("ROLE_CONFUSION", re.compile(r"(?i)\b(?:you are now|act as|pretend to be)\b[^\n]{0,50}\b(?:DAN|unrestricted|jailbroken|root)\b"), "prompt attempts role or privilege confusion"),
 )
+
+
+def _digest(material: str) -> str:
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
 def _line_excerpt(text: str) -> str:
@@ -102,24 +107,38 @@ def scan_text(path: Path, text: str) -> tuple[Finding, ...]:
         excerpt = _redact(_line_excerpt(line))
         match = SECRET_ASSIGNMENT.search(line)
         if match:
-            findings.append(Finding("SECRET_ASSIGNMENT", "high", display, number, "possible secret assigned in prompt or config", excerpt))
-        if OPENAI_KEY.search(line):
-            findings.append(Finding("SECRET_OPENAI_KEY", "critical", display, number, "OpenAI-style API key material found", excerpt))
-        if AWS_KEY.search(line):
-            findings.append(Finding("SECRET_AWS_KEY", "critical", display, number, "AWS-style access key material found", excerpt))
-        if PRIVATE_KEY.search(line):
-            findings.append(Finding("SECRET_PRIVATE_KEY", "critical", display, number, "private key material found", excerpt))
+            findings.append(Finding("SECRET_ASSIGNMENT", "high", display, number, "possible secret assigned in prompt or config", excerpt, _digest(match.group(2))))
+        match = OPENAI_KEY.search(line)
+        if match:
+            findings.append(Finding("SECRET_OPENAI_KEY", "critical", display, number, "OpenAI-style API key material found", excerpt, _digest(match.group(0))))
+        match = AWS_KEY.search(line)
+        if match:
+            findings.append(Finding("SECRET_AWS_KEY", "critical", display, number, "AWS-style access key material found", excerpt, _digest(match.group(0))))
+        match = PRIVATE_KEY.search(line)
+        if match:
+            # Bind to the first body line as well, since the header alone is
+            # identical for every private key.
+            body = ""
+            for candidate in lines[number:number + 4]:
+                stripped = candidate.strip()
+                if stripped and not stripped.startswith("-----"):
+                    body = stripped
+                    break
+            findings.append(Finding("SECRET_PRIVATE_KEY", "critical", display, number, "private key material found", excerpt, _digest(match.group(0) + "\n" + body)))
         for rule_id, pattern, severity, message in TOKEN_RULES:
-            if pattern.search(line):
-                findings.append(Finding(rule_id, severity, display, number, message, excerpt))
-        if EMAIL.search(line):
-            findings.append(Finding("PII_EMAIL", "medium", display, number, "email address found", excerpt))
-        if PHONE.search(line):
-            findings.append(Finding("PII_PHONE", "low", display, number, "phone number found", excerpt))
+            match = pattern.search(line)
+            if match:
+                findings.append(Finding(rule_id, severity, display, number, message, excerpt, _digest(match.group(0))))
+        match = EMAIL.search(line)
+        if match:
+            findings.append(Finding("PII_EMAIL", "medium", display, number, "email address found", excerpt, _digest(match.group(0).lower())))
+        match = PHONE.search(line)
+        if match:
+            findings.append(Finding("PII_PHONE", "low", display, number, "phone number found", excerpt, _digest(re.sub(r"\D", "", match.group(0)))))
         for card in CARD.finditer(line):
             digits = re.sub(r"\D", "", card.group(0))
             if _luhn_ok(digits):
-                findings.append(Finding("PII_PAYMENT_CARD", "critical", display, number, "payment-card number found", excerpt))
+                findings.append(Finding("PII_PAYMENT_CARD", "critical", display, number, "payment-card number found", excerpt, _digest(digits)))
                 break
         for rule_id, pattern, message in INJECTION_RULES:
             if pattern.search(line):

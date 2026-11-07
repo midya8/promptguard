@@ -12,12 +12,21 @@ SCHEMA_VERSION = 1
 def fingerprint(finding: Finding) -> str:
     """Stable identity for a finding, independent of its line number.
 
-    The digest uses the rule, normalized path, message and the already-redacted
-    excerpt, so baseline files never contain raw credential material and a
-    finding keeps its identity when unrelated lines shift above it.
+    For rules that match sensitive material, the fingerprint binds to the
+    rule, the normalized path and a SHA-256 digest of the raw matched value.
+    A rotated or newly introduced credential on a baselined line therefore
+    surfaces as a new finding, while the same credential re-found in the same
+    file stays suppressed. The digest is one-way over high-entropy material
+    and the baseline file never contains raw credential values.
+
+    Findings without sensitive material (injection patterns, metadata
+    structure) fall back to the rule, path, message and redacted excerpt.
     """
     normalized = " ".join(finding.path.replace("\\", "/").split())
-    material = "\n".join((finding.rule_id, normalized, finding.message, finding.excerpt))
+    if finding.material_digest:
+        material = "\n".join((finding.rule_id, normalized, "material", finding.material_digest))
+    else:
+        material = "\n".join((finding.rule_id, normalized, finding.message, finding.excerpt))
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
