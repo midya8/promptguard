@@ -69,6 +69,21 @@ assert baselined["suppressed_count"] == 8
 bl_md = open("$out_dir/risky-baselined.md", encoding="utf-8").read()
 assert "| Suppressed by baseline | 8 |" in bl_md
 PY
+# A rotated credential on a baselined line is a new finding, not suppressed.
+python3 -m promptguard scan "$out_dir/tokens.md" --write-baseline "$out_dir/token-baseline.json" >/dev/null
+python3 -m promptguard scan "$out_dir/tokens.md" --baseline "$out_dir/token-baseline.json" --json "$out_dir/tokens-baselined.json" >/dev/null
+python3 - <<PY
+import json
+data = json.load(open("$out_dir/tokens-baselined.json", encoding="utf-8"))
+assert data["finding_count"] == 0
+assert data["suppressed_count"] == 4
+PY
+ROTATED_TOKEN="ghp_ROTATED1234567""ROTATED123456789012345678"
+sed -i "s/$GH_TOKEN/$ROTATED_TOKEN/" "$out_dir/tokens.md"
+if python3 -m promptguard scan "$out_dir/tokens.md" --baseline "$out_dir/token-baseline.json" --fail-on critical >/dev/null 2>&1; then
+  echo "expected a rotated token on a baselined line to fail the gate" >&2
+  exit 1
+fi
 if python3 -m promptguard scan examples/prompts/risky.md --fail-on high >"$out_dir/gate.txt" 2>&1; then
   echo "expected risky prompt gate to fail" >&2
   exit 1
