@@ -173,7 +173,7 @@ def _md_cell(value: object) -> str:
     return text.replace("\\", "\\\\").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
 
 
-def render_markdown(result: ScanResult) -> str:
+def render_markdown(result: ScanResult, suppressed: int = 0) -> str:
     """Render findings as a Markdown report suited to CI job summaries."""
     payload = result.to_dict()
     counts = payload["severity_counts"]
@@ -185,13 +185,17 @@ def render_markdown(result: ScanResult) -> str:
         f"| Files scanned | {payload['files_scanned']} |",
         f"| Findings | {payload['finding_count']} |",
         f"| Max severity | {_md_cell(payload['max_severity'] or 'none')} |",
+    ]
+    if suppressed:
+        lines.append(f"| Suppressed by baseline | {suppressed} |")
+    lines.extend([
         f"| Scan errors | {len(result.errors)} |",
         "",
         "## Severity counts",
         "",
         "| Severity | Findings |",
         "|---|---|",
-    ]
+    ])
     for severity in ("critical", "high", "medium", "low", "info"):
         lines.append(f"| {severity} | {counts[severity]} |")
     lines.extend(["", "## Findings", ""])
