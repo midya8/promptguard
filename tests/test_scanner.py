@@ -1,7 +1,7 @@
-from pathlib import Path
+import json
 import tempfile
 import unittest
-
+from pathlib import Path
 from promptguard.scanner import scan_paths, scan_text
 
 
@@ -196,3 +196,115 @@ class TokenRuleTests(unittest.TestCase):
             {item.rule_id for item in result.findings},
         )
         self.assertEqual((), result.errors)
+
+
+class BaselineTests(unittest.TestCase):
+    def _scan_risky(self):
+        return scan_paths(["examples/prompts/risky.md"])
+
+    def test_fingerprint_is_line_number_independent(self):
+        from promptguard.baseline import fingerprint
+        from promptguard.models import Finding
+        base = Finding("SECRET_JWT", "high", "a/b.md", 10, "msg", "excerpt ...REDACTED")
+        shifted = Finding("SECRET_JWT", "high", "a/b.md", 87, "msg", "excerpt ...REDACTED")
+        self.assertEqual(fingerprint(base), fingerprint(shifted))
+
+    def test_fingerprint_normalizes_windows_paths(self):
+        from promptguard.baseline import fingerprint
+        from promptguard.models import Finding
+        posix = Finding("RULE", "low", "a/b.md", 1, "m", "e")
+        windows = Finding("RULE", "low", "a\\b.md", 1, "m", "e")
+        self.assertEqual(fingerprint(posix), fingerprint(windows))
+
+    def test_write_then_load_round_trip(self):
+        from promptguard.baseline import fingerprint, load_baseline, write_baseline
+        result = self._scan_risky()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "baseline.json"
+            written = write_baseline(path, result.findings)
+            self.assertEqual(written, len({fingerprint(f) for f in result.findings}))
+            loaded = load_baseline(path)
+        self.assertEqual(loaded, frozenset(fingerprint(f) for f in result.findings))
+
+    def test_baseline_file_contains_no_credential_material(self):
+        from promptguard.baseline import write_baseline
+        result = scan_paths(["examples/prompts/risky.md"])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "baseline.json"
+            write_baseline(path, result.findings)
+            content = path.read_text(encoding="utf-8")
+        for marker in ("AKIA", "sk-", "xox", "ghp_", "AIza", "eyJ", "@"):
+            self.assertNotIn(marker, content)
+
+    def test_load_missing_baseline_is_empty(self):
+        from promptguard.baseline import load_baseline
+        self.assertEqual(load_baseline(Path("/nonexistent/baseline.json")), frozenset())
+
+    def test_load_malformed_baseline_raises(self):
+        from promptguard.baseline import BaselineError, load_baseline
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "baseline.json"
+            path.write_text("not json", encoding="utf-8")
+            with self.assertRaises(BaselineError):
+                load_baseline(path)
+
+    def test_load_wrong_schema_version_raises(self):
+        from promptguard.baseline import BaselineError, load_baseline
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "baseline.json"
+            path.write_text(json.dumps({"schema_version": 99, "fingerprints": []}), encoding="utf-8")
+            with self.assertRaises(BaselineError):
+                load_baseline(path)
+
+    def test_apply_baseline_suppresses_known_and_keeps_new(self):
+        from promptguard.baseline import apply_baseline, fingerprint
+        result = self._scan_risky()
+        known = frozenset({fingerprint(result.findings[0])})
+        filtered, suppressed = apply_baseline(result, known)
+        self.assertEqual(suppressed, 1)
+        self.assertEqual(len(filtered.findings), len(result.findings) - 1)
+        self.assertNotIn(result.findings[0], filtered.findings)
+
+    def test_apply_baseline_empty_is_noop(self):
+        from promptguard.baseline import apply_baseline
+        result = self._scan_risky()
+        filtered, suppressed = apply_baseline(result, frozenset())
+        self.assertEqual(suppressed, 0)
+        self.assertEqual(filtered.findings, result.findings)
+
+    def test_cli_baseline_flow(self):
+        from promptguard.cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = str(Path(tmp) / "baseline.json")
+            report = str(Path(tmp) / "report.json")
+            rc = main(["scan", "examples/prompts/risky.md", "--write-baseline", baseline])
+            self.assertEqual(rc, 0)
+            rc = main(["scan", "examples/prompts/risky.md", "--baseline", baseline, "--json", report, "--fail-on", "high"])
+            self.assertEqual(rc, 0)
+            payload = json.loads(Path(report).read_text(encoding="utf-8"))
+            self.assertEqual(payload["finding_count"], 0)
+            self.assertEqual(payload["suppressed_count"], 8)
+
+    def test_cli_new_findings_still_fail_gate_with_baseline(self):
+        from promptguard.cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = str(Path(tmp) / "baseline.json")
+            main(["scan", "examples/prompts/safe.md", "--write-baseline", baseline])
+            rc = main(["scan", "examples/prompts/risky.md", "--baseline", baseline, "--fail-on", "high"])
+            self.assertEqual(rc, 1)
+
+    def test_cli_malformed_baseline_exits_2(self):
+        from promptguard.cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "baseline.json"
+            baseline.write_text("{}", encoding="utf-8")
+            rc = main(["scan", "examples/prompts/risky.md", "--baseline", str(baseline)])
+            self.assertEqual(rc, 2)
+
+    def test_markdown_report_lists_suppressed_count(self):
+        from promptguard.baseline import apply_baseline, fingerprint
+        from promptguard.report import render_markdown
+        result = self._scan_risky()
+        filtered, suppressed = apply_baseline(result, frozenset(fingerprint(f) for f in result.findings[:3]))
+        text = render_markdown(filtered, suppressed=suppressed)
+        self.assertIn("| Suppressed by baseline | 3 |", text)
