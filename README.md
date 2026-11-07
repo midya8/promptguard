@@ -53,12 +53,17 @@ python3 -m promptguard scan prompts/ --write-baseline .promptguard-baseline.json
 python3 -m promptguard scan prompts/ --baseline .promptguard-baseline.json --fail-on high
 ```
 
-Baselines store per-finding SHA-256 fingerprints built from the rule, path,
-message and already-redacted excerpt, so the file contains no credential
-material and a finding keeps its identity when unrelated lines shift above it.
-Suppressed findings stay out of reports and gate decisions; the JSON payload
-and Markdown summary report the suppressed count, and a malformed baseline
-fails closed with exit code 2.
+Baselines store per-finding SHA-256 fingerprints. For secret and
+personal-data rules the fingerprint binds to a one-way digest of the matched
+value itself plus the rule and path, so a rotated or newly introduced
+credential surfaces as a new finding even on a baselined line, while the same
+credential re-found in the same file stays suppressed. The baseline file
+contains no raw credential material. Findings without sensitive material
+(prompt-injection language, metadata structure) use a content fingerprint
+built from the rule, path, message and redacted excerpt. Suppressed findings
+stay out of reports and gate decisions; the JSON payload and Markdown summary
+report the suppressed count, and a malformed baseline fails closed with exit
+code 2.
 
 ## Rules
 
