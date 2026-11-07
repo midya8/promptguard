@@ -2,7 +2,7 @@
 
 Local-first prompt, secret and prompt-injection linting for AI systems.
 
-PromptGuard scans prompt, Markdown, JSON and YAML files for credential material, personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON, SARIF 2.1.0 output for code-scanning tools, JUnit XML for CI test viewers, and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.
+PromptGuard scans prompt, Markdown, JSON and YAML files for credential material, personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON, SARIF 2.1.0 output for code-scanning tools, JUnit XML for CI test viewers, Markdown reports for CI job summaries, and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.
 
 ## Why
 
@@ -12,7 +12,7 @@ Prompt files are production configuration. They often mix instructions, examples
 - finds email addresses, phone numbers and payment-card numbers with Luhn validation;
 - finds prompt-injection language that asks a model to ignore prior instructions, reveal hidden prompts, bypass controls or exfiltrate secrets;
 - checks prompt metadata frontmatter for `name`, `description` and `version`;
-- redacts secrets and contact details in terminal, JSON, SARIF, JUnit XML and HTML findings;
+- redacts secrets and contact details in terminal, JSON, SARIF, JUnit XML, Markdown and HTML findings;
 - fails CI on a selected severity or finding-count threshold.
 
 ## Commands
@@ -23,14 +23,15 @@ Scan one file or a directory:
 python3 -m promptguard scan examples/prompts
 ```
 
-Write JSON, SARIF, JUnit XML and HTML reports:
+Write JSON, SARIF, JUnit XML, Markdown and HTML reports:
 
 ```bash
 python3 -m promptguard scan examples/prompts/risky.md \
   --json findings.json \
   --html report.html \
   --sarif findings.sarif \
-  --junit findings.xml
+  --junit findings.xml \
+  --markdown findings.md
 ```
 
 Fail CI on high-severity findings:
@@ -81,6 +82,6 @@ The test suite runs fully offline. CI runs the same checks on Python 3.10 throug
 
 - **Local by default:** scanning uses only the filesystem and standard library.
 - **Redaction by default:** findings preserve enough context for review without copying full credentials into reports.
-- **Actionable output:** every finding carries a rule ID, severity, file, line, message and redacted excerpt; SARIF output maps findings to code-scanning rule metadata and locations; JUnit XML exposes findings to ordinary CI test viewers.
+- **Actionable output:** every finding carries a rule ID, severity, file, line, message and redacted excerpt; SARIF output maps findings to code-scanning rule metadata and locations; JUnit XML exposes findings to ordinary CI test viewers; Markdown summaries fit native CI job-summary surfaces with escaped table cells.
 - **Scriptable gates:** severity and finding-count thresholds provide meaningful CI exit codes.
 - **Safe reports:** HTML output escapes file paths, messages and excerpts and needs no JavaScript; JUnit XML is serialized with standard-library XML escaping.
