@@ -13,6 +13,9 @@ class Finding:
     line: int
     message: str
     excerpt: str
+    # SHA-256 of the raw matched secret/PII material, when the rule matches
+    # sensitive material. Never the raw value; never serialized to reports.
+    material_digest: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
