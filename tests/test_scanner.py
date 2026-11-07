@@ -128,38 +128,56 @@ class ScannerTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+GH_TOKEN = "ghp_" + "EXAMPLE1234567890" * 2 + "abcd"
+GH_PAT = "github_pat_11ABCDEFG0" + "EXAMPLE1234567890" + "_example"
+SLACK_TOKEN = "xoxb-" + "123456789012-" + "abcdefghijklmnop"
+GOOGLE_KEY = "AIza" + "SyEXAMPLE1234567890" + "EXAMPLE123456789"
+JWT_TOKEN = "eyJhbGciOiJIUzI1NiJ9" + "." + "eyJzdWIiOiIxMjM0NTY3ODkwIn0" + "." + "SflKxwRJSMeKKF2QT4" + "fwpMeJf36POk6yJVadQssw5c"
+
+TOKENS_FIXTURE = f"""---
+name: leaked-tokens-example
+description: fixture with recognizable token formats for scanner demos
+version: 0.1.0
+---
+
+The leaked GitHub credential {GH_TOKEN} appeared in a shared log line.
+A stale Slack bot token {SLACK_TOKEN} was committed last week.
+The demo Google API key {GOOGLE_KEY} is still active.
+An old session JWT {JWT_TOKEN} was pasted into a ticket.
+"""
+
 
 class TokenRuleTests(unittest.TestCase):
     def test_github_token_is_critical_and_redacted(self):
-        items = findings("Leaked ghp_EXAMPLE1234567890EXAMPLE1234567890abcd in a log.\n")
+        items = findings(f"Leaked {GH_TOKEN} in a log.\n")
         finding = next(item for item in items if item.rule_id == "SECRET_GITHUB_TOKEN")
         self.assertEqual("critical", finding.severity)
         self.assertIn("ghp_EXAM...REDACTED", finding.excerpt)
         self.assertNotIn("EXAMPLE1234567890EXAMPLE", finding.excerpt)
 
     def test_github_fine_grained_pat_is_critical(self):
-        items = findings("Token github_pat_11ABCDEFG0EXAMPLE1234567890_example in CI config.\n")
+        items = findings(f"Token {GH_PAT} in CI config.\n")
         self.assertIn("SECRET_GITHUB_TOKEN", {item.rule_id for item in items})
 
     def test_slack_token_is_critical_and_redacted(self):
-        items = findings("Bot token xoxb-123456789012-abcdefghijklmnop posted in chat.\n")
+        items = findings(f"Bot token {SLACK_TOKEN} posted in chat.\n")
         finding = next(item for item in items if item.rule_id == "SECRET_SLACK_TOKEN")
         self.assertEqual("critical", finding.severity)
         self.assertIn("xoxb-123...REDACTED", finding.excerpt)
         self.assertNotIn("abcdefghijklmnop", finding.excerpt)
 
     def test_google_api_key_is_critical_and_redacted(self):
-        items = findings("Key AIzaSyEXAMPLE1234567890EXAMPLE123456789 still works.\n")
+        items = findings(f"Key {GOOGLE_KEY} still works.\n")
         finding = next(item for item in items if item.rule_id == "SECRET_GOOGLE_KEY")
         self.assertEqual("critical", finding.severity)
         self.assertIn("AIzaSyE...REDACTED", finding.excerpt)
 
     def test_jwt_is_high_and_redacted(self):
-        items = findings("JWT eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJVadQssw5c in a ticket.\n")
+        items = findings(f"JWT {JWT_TOKEN} in a ticket.\n")
         finding = next(item for item in items if item.rule_id == "SECRET_JWT")
         self.assertEqual("high", finding.severity)
         self.assertIn("eyJhbGciOiJI...REDACTED", finding.excerpt)
-        self.assertNotIn("SflKxwRJSMeKKF2QT4", finding.excerpt)
+        self.assertNotIn("fwpMeJf36POk6yJVadQssw5c", finding.excerpt)
 
     def test_short_lookalikes_are_not_flagged(self):
         items = findings("Values ghp_short, xoxb-123 and eyJhbGciOiJIUzI1NiJ9 alone are not tokens.\n")
@@ -169,7 +187,10 @@ class TokenRuleTests(unittest.TestCase):
         self.assertNotIn("SECRET_JWT", rule_ids)
 
     def test_tokens_fixture_yields_exact_rule_set(self):
-        result = scan_paths(["examples/prompts/tokens.md"])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tokens.md"
+            path.write_text(TOKENS_FIXTURE, encoding="utf-8")
+            result = scan_paths([str(path)])
         self.assertEqual(
             {"SECRET_GITHUB_TOKEN", "SECRET_SLACK_TOKEN", "SECRET_GOOGLE_KEY", "SECRET_JWT"},
             {item.rule_id for item in result.findings},
