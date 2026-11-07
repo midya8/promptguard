@@ -3,6 +3,7 @@ from __future__ import annotations
 from html import escape
 import json
 from typing import Any
+import xml.etree.ElementTree as ET
 
 from .models import Finding, ScanResult
 
@@ -37,6 +38,61 @@ def render_report(result: ScanResult) -> str:
 {errors_html}
 </main></body></html>
 """
+
+
+def render_junit(result: ScanResult) -> str:
+    """Render findings as a JUnit XML suite for CI test viewers."""
+    findings = list(result.findings)
+    errors = list(result.errors)
+    tests = len(findings) + len(errors)
+    if tests == 0:
+        tests = result.files_scanned
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "promptguard",
+            "tests": str(tests),
+            "failures": str(len(findings)),
+            "errors": str(len(errors)),
+        },
+    )
+    if not findings and not errors:
+        ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "promptguard.clean",
+                "name": f"{result.files_scanned} file(s) scanned with no findings",
+            },
+        )
+    for index, finding in enumerate(findings, start=1):
+        testcase = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": f"promptguard.{finding.severity}",
+                "name": f"{finding.rule_id} {finding.path}:{finding.line}",
+            },
+        )
+        failure = ET.SubElement(
+            testcase,
+            "failure",
+            {
+                "type": finding.severity,
+                "message": finding.message,
+            },
+        )
+        failure.text = f"{finding.rule_id} at {finding.path}:{finding.line}\n{finding.excerpt}"
+    for error in errors:
+        testcase = ET.SubElement(
+            suite,
+            "testcase",
+            {"classname": "promptguard.scan_error", "name": error},
+        )
+        element = ET.SubElement(testcase, "error", {"message": error})
+        element.text = error
+    ET.indent(suite, space="  ")
+    return "<?xml version='1.0' encoding='utf-8'?>\n" + ET.tostring(suite, encoding="unicode") + "\n"
 
 _SARIF_LEVELS = {
     "critical": "error",
