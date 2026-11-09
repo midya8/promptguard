@@ -1,5 +1,44 @@
 # PromptGuard
 
+Local-first prompt linting with a full-stage baseline and CI-gate witness.
+
+[Interactive policy inspector](https://midya8.github.io/promptguard/) | [Definitions and reproduction](EVIDENCE.md) | [Original README](docs/original-readme.md)
+
+## Silence is not a clean scan
+
+A finding can disappear at the severity filter or baseline before a gate sees it. PromptGuard now records every current finding, its SHA-256 identity, eligibility, baseline match, disposition, reported payload, and final gate decision. The browser independently recomputes bounded synthetic finding records using JavaScript and WebCrypto. It does not scan prompts, call a model, or measure detection effectiveness.
+
+```bash
+python -m pip install .
+promptguard scan prompts/ --min-severity low --baseline baseline.json \
+  --fail-on high --max-findings 10 --audit witness.json --json findings.json
+promptguard audit --spec examples/audit.json --json audit.json
+```
+
+`scan --audit` retains below-filter and suppressed rows while ordinary reports still contain only reported findings. Incomplete scans return 2 and cannot write a new baseline. Gate failures return 1; a completed scan with passing configured gates returns 0. `audit` returns 0 for a valid computation, even when its computed scan-policy witness says 1 or 2. Invalid audit input returns 2.
+
+Native fixes redact full lines before truncation, redact metadata excerpts, retain every recognized sensitive match on a line, count successfully read files, report traversal failures, and reject malformed baseline identities, duplicate JSON keys and invalid encoding. Metadata identities now bind the original first line privately when redaction changes it, so rotated sensitive material cannot hide behind identical redacted metadata. Existing metadata baseline entries can therefore surface again and require review. These changes add no new detection patterns.
+
+A fingerprint is not anonymity. Low-entropy values may be guessed. Real baselines, paths, errors and full witnesses can carry private context: keep them private. Existing identity aliases remain visible: line and severity are not bound, slash and whitespace normalization can alias distinct paths. A baseline records suppression, not safety.
+
+All original 68 tests, fixed fixtures and offline demo remain unchanged. The original fixtures contain documented dummy credentials; this extension adds only reserved-domain contacts, abstract `fixture:` tags and mocked noncredential patterns. No protection bypass is required or supported.
+
+## Reproduce the evidence
+
+```bash
+python -m unittest discover -s tests -v
+python tools/build_audits.py
+npm test
+bash tools/wheel_smoke.sh
+bash examples/demo.sh
+```
+
+87 Python tests include 13,320 exhaustive small policy controls. Independent JavaScript checks compare all 27 reports (735 numeric and 1,443 other leaves). Actual Chrome checks every displayed row, fingerprint table, gate field, selected full record, export and stage mark: 50 current rows, 17 prior rows, 16 unique baseline entries across cases, 50 full records and 181 circles. Mobile containment is checked at 320, 390 and 1280 pixels. The isolated wheel checks all 27 reports and eight installed module origins outside the checkout.
+
+---
+
+## Original scanner commands and context
+
 Local-first prompt, secret and prompt-injection linting for AI systems.
 
 PromptGuard scans prompt, Markdown, JSON and YAML files for credential material (including OpenAI, AWS, GitHub, Slack and Google tokens and JWTs), personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON, SARIF 2.1.0 output for code-scanning tools, JUnit XML for CI test viewers, Markdown reports for CI job summaries, and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.

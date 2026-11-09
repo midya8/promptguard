@@ -83,8 +83,12 @@ def _frontmatter_findings(path: Path, text: str) -> Iterable[Finding]:
         return ()
     display = str(path)
     if not text.startswith("---\n"):
+        first = text.splitlines()[0] if text.splitlines() else ""
+        redacted = _redact(first)
+        # Keep rotated material distinguishable without exposing it in the excerpt.
+        digest = _digest(first) if redacted != first else None
         return (
-            Finding("STRUCTURE_FRONTMATTER", "info", display, 1, "prompt file has no metadata frontmatter", _line_excerpt(text.splitlines()[0] if text.splitlines() else "")),
+            Finding("STRUCTURE_FRONTMATTER", "info", display, 1, "prompt file has no metadata frontmatter", _line_excerpt(redacted), digest),
         )
     end = text.find("\n---", 4)
     if end == -1:
@@ -104,18 +108,14 @@ def scan_text(path: Path, text: str) -> tuple[Finding, ...]:
     display = str(path)
     lines = text.splitlines()
     for number, line in enumerate(lines, 1):
-        excerpt = _redact(_line_excerpt(line))
-        match = SECRET_ASSIGNMENT.search(line)
-        if match:
+        excerpt = _line_excerpt(_redact(line))
+        for match in SECRET_ASSIGNMENT.finditer(line):
             findings.append(Finding("SECRET_ASSIGNMENT", "high", display, number, "possible secret assigned in prompt or config", excerpt, _digest(match.group(2))))
-        match = OPENAI_KEY.search(line)
-        if match:
+        for match in OPENAI_KEY.finditer(line):
             findings.append(Finding("SECRET_OPENAI_KEY", "critical", display, number, "OpenAI-style API key material found", excerpt, _digest(match.group(0))))
-        match = AWS_KEY.search(line)
-        if match:
+        for match in AWS_KEY.finditer(line):
             findings.append(Finding("SECRET_AWS_KEY", "critical", display, number, "AWS-style access key material found", excerpt, _digest(match.group(0))))
-        match = PRIVATE_KEY.search(line)
-        if match:
+        for match in PRIVATE_KEY.finditer(line):
             # Bind to the first body line as well, since the header alone is
             # identical for every private key.
             body = ""
@@ -126,20 +126,16 @@ def scan_text(path: Path, text: str) -> tuple[Finding, ...]:
                     break
             findings.append(Finding("SECRET_PRIVATE_KEY", "critical", display, number, "private key material found", excerpt, _digest(match.group(0) + "\n" + body)))
         for rule_id, pattern, severity, message in TOKEN_RULES:
-            match = pattern.search(line)
-            if match:
+            for match in pattern.finditer(line):
                 findings.append(Finding(rule_id, severity, display, number, message, excerpt, _digest(match.group(0))))
-        match = EMAIL.search(line)
-        if match:
+        for match in EMAIL.finditer(line):
             findings.append(Finding("PII_EMAIL", "medium", display, number, "email address found", excerpt, _digest(match.group(0).lower())))
-        match = PHONE.search(line)
-        if match:
+        for match in PHONE.finditer(line):
             findings.append(Finding("PII_PHONE", "low", display, number, "phone number found", excerpt, _digest(re.sub(r"\D", "", match.group(0)))))
         for card in CARD.finditer(line):
             digits = re.sub(r"\D", "", card.group(0))
             if _luhn_ok(digits):
                 findings.append(Finding("PII_PAYMENT_CARD", "critical", display, number, "payment-card number found", excerpt, _digest(digits)))
-                break
         for rule_id, pattern, message in INJECTION_RULES:
             if pattern.search(line):
                 findings.append(Finding(rule_id, "high", display, number, message, excerpt))
@@ -158,7 +154,7 @@ def _iter_files(paths: Iterable[str]) -> tuple[list[Path], list[str]]:
         if path.is_file():
             files.append(path)
             continue
-        for root, dirs, names in os.walk(path):
+        for root, dirs, names in os.walk(path, onerror=lambda exc: errors.append(f"cannot traverse {path}: {exc}")):
             dirs[:] = sorted(name for name in dirs if name not in SKIP_DIRS)
             for name in sorted(names):
                 candidate = Path(root) / name
@@ -171,6 +167,7 @@ def _iter_files(paths: Iterable[str]) -> tuple[list[Path], list[str]]:
 def scan_paths(paths: Iterable[str], *, min_severity: str = "info") -> ScanResult:
     files, errors = _iter_files(paths)
     findings: list[Finding] = []
+    scanned = 0
     for path in files:
         try:
             if path.stat().st_size > MAX_FILE_BYTES:
@@ -184,10 +181,11 @@ def scan_paths(paths: Iterable[str], *, min_severity: str = "info") -> ScanResul
         except (OSError, UnicodeDecodeError) as exc:
             errors.append(f"cannot read {path}: {exc}")
             continue
+        scanned += 1
         findings.extend(scan_text(path, text))
     threshold = SEVERITY_ORDER[min_severity]
     return ScanResult(
-        files_scanned=len(files),
+        files_scanned=scanned,
         findings=tuple(sorted((item for item in findings if SEVERITY_ORDER[item.severity] >= threshold), key=lambda item: (-SEVERITY_ORDER[item.severity], item.path, item.line, item.rule_id))),
         errors=tuple(errors),
     )

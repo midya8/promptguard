@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {auditSpec} from '../docs/engine.js';
+const fixture=JSON.parse(fs.readFileSync(new URL('../docs/audit.json',import.meta.url)));let numeric=0,other=0;
+function compare(a,b,p='root'){assert.equal(typeof a,typeof b,p);if(typeof a==='number'){numeric++;assert.equal(a,b,p)}else if(a===null||typeof a!=='object'){other++;assert.equal(a,b,p)}else{assert.deepEqual(Object.keys(a).sort(),Object.keys(b).sort(),p);for(const k of Object.keys(a))compare(a[k],b[k],p+'.'+k)}}
+test('complete independent synthetic finding policy witnesses',async()=>{for(const c of fixture.cases)compare(await auditSpec(c.report.spec),c.report);console.log(JSON.stringify({cases:fixture.cases.length,numeric,other}))});
+test('invalid abstract inputs',async()=>{const spec=structuredClone(fixture.cases[0].report.spec);for(const v of [{...spec,files_scanned:true},{...spec,errors:[3]},{...spec,current:[{}]},{...spec,policy:{min_severity:[],fail_on:null,max_findings:null}}])await assert.rejects(auditSpec(v));});

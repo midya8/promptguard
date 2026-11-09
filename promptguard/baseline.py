@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from .models import Finding, ScanResult
@@ -44,13 +45,20 @@ def load_baseline(path: Path) -> frozenset[str]:
     if not path.exists():
         return frozenset()
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        def unique(items):
+            out = {}
+            for key, value in items:
+                if key in out:
+                    raise BaselineError(f"baseline {path} has duplicate JSON keys")
+                out[key] = value
+            return out
+        payload = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise BaselineError(f"cannot read baseline {path}: {exc}") from exc
-    if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(payload, dict) or type(payload.get("schema_version")) is not int or payload.get("schema_version") != SCHEMA_VERSION:
         raise BaselineError(f"baseline {path} has an unsupported schema version")
     fingerprints = payload.get("fingerprints")
-    if not isinstance(fingerprints, list) or not all(isinstance(item, str) for item in fingerprints):
+    if not isinstance(fingerprints, list) or not all(isinstance(item, str) and re.fullmatch(r"[0-9a-f]{64}", item) for item in fingerprints):
         raise BaselineError(f"baseline {path} has an invalid fingerprints list")
     return frozenset(fingerprints)
 

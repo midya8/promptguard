@@ -12,6 +12,9 @@ license = {text = "MIT"}
 authors = [{name = "Midya Rahmani"}]
 keywords = ["ai-security", "prompt-injection", "llm", "secrets", "linting"]
 
+[project.scripts]
+promptguard = "promptguard.cli:main"
+
 [project.urls]
 Repository = "https://github.com/midya8/promptguard"
 

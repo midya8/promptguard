@@ -1,0 +1,9 @@
+{
+  "README.md": "7248854d3d43ea337896e792ba5dabd6ee695918be333737a044966cd9568211",
+  "examples/demo.sh": "bfffa42267012183f6d591788e098eacc196aa89c33548cc261e5039495356b2",
+  "examples/prompts/risky.md": "660c3b7022f0fdda407be046830b90a15e801949c67270395e5709c99ffae17f",
+  "examples/prompts/safe.md": "f5de19e9a14d89573506632dfc79fc4d33158578c8889b3ae276f8db32c255c0",
+  "tests/__init__.py": "a3a74eed67ed8c8d85a4063cd7ae7f176335c18c6fdb4aec99c2eff95783eb1b",
+  "tests/test_cli.py": "08a177b26295589fa10fa5be100fefdc3a37d8c05dae418c57876f7afd917370",
+  "tests/test_scanner.py": "fdb55f6ef30806cf511e00d51fd2f3d20774f83d50e4d4e5e6f4da52d8d1549f"
+}
