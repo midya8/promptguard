@@ -43,7 +43,7 @@ def controls():
 
 if __name__=='__main__':
     cases=controls();reports=[dict(c,report=quota_spec(c['spec'])) for c in cases]
-    def save(path,obj):path.write_text(json.dumps(obj,indent=2,sort_keys=True)+'\n')
+    def save(path,obj):path.write_text(json.dumps(obj,separators=(',',':'),sort_keys=True)+'\n')
     save(ROOT/'examples/quota.json',cases[0]['spec']);save(ROOT/'examples/quota-reports.json',reports)
     (ROOT/'docs/quota-data.js').write_text('export const quotaCases='+json.dumps(cases,separators=(',',':'),sort_keys=True)+';\n')
     print(json.dumps(dict(cases=len(cases),current=sum(len(r['spec']['current']) for r in reports),prior=sum(len(r['spec']['prior']) for r in reports),entries=sum(len(r['report']['baseline']['entries']) for r in reports))))
