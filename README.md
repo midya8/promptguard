@@ -144,3 +144,10 @@ The test suite runs fully offline. CI runs the same checks on Python 3.10 throug
 - **Actionable output:** every finding carries a rule ID, severity, file, line, message and redacted excerpt; SARIF output maps findings to code-scanning rule metadata and locations; JUnit XML exposes findings to ordinary CI test viewers; Markdown summaries fit native CI job-summary surfaces with escaped table cells.
 - **Scriptable gates:** severity and finding-count thresholds provide meaningful CI exit codes.
 - **Safe reports:** HTML output escapes file paths, messages and excerpts and needs no JavaScript; JUnit XML is serialized with standard-library XML escaping.
+
+
+## Opt-in occurrence quotas
+
+A separate actual-scanner baseline mode suppresses at most the declared occurrence count. Exact path, severity, rule and material/content identity are bound; the original v1 set baseline and scanner patterns stay unchanged. One declared allowance suppresses one of three equal-identity occurrences, while the legacy set suppresses all three. Every consumption, unused entry and gate decision is visible in the [quota inspector](https://midya8.github.io/promptguard/quota.html).
+
+100 Python tests retain all87 originals; seven Node/actual-Chrome tests retain allthree originals.4,374 exhaustive occurrence-rank controls and200 seeded full native/browser comparisons;24 complete reports,52currentrows32priorrows22entries104SVGmarks, trusted downloads/native replay and isolated API/module/console reproduction. Equal-identity rows remain interchangeable, not historically tracked; exact paths are not repository IDs. Manual quotas, hashes and passing gates are not safety or authorization. [Contract, limits, sources and reproduction](QUOTAS.md).
