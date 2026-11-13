@@ -1,10 +1,14 @@
 # Occurrence-limited baselines
 
-PromptGuard adds a separate opt-in quota baseline for the actual scanner, plus an independent synthetic policy inspector. The original scanner patterns, v1 fingerprint set, prior audit API and report adapters remain unchanged. The package and SARIF version stay 0.2.0 to retain their existing version contract; the new quota schema has its own identifier.
+Quota mode limits how many times a baseline can suppress the same finding.
+It is opt-in and works with the actual scanner. A separate browser inspector
+replays synthetic records; it does not scan files. The original scanner
+patterns, v1 fingerprint set, audit API and report adapters are unchanged.
+The package and SARIF version stay 0.2.0; the quota schema has its own identifier.
 
 [Open the quota inspector](https://midya8.github.io/promptguard/quota.html) · [Original inspector](https://midya8.github.io/promptguard/)
 
-## One accepted occurrence is not three
+## A one-occurrence allowance
 
 The default abstract control has three equal-identity current occurrences and one eligible prior occurrence. A legacy set suppresses all three. The quota suppresses the first and reports the next two. With a medium severity gate, the declared scan-policy exit is 1. This is a constructed policy example, not an attack, real secret scan, detection benchmark or proof of improved security.
 
@@ -41,7 +45,7 @@ An exact path is not a repository ID, canonical filesystem identity or containme
 
 A hash is not anonymity or encryption. Low-entropy source values can be guessed. Quota files, full witnesses, paths, errors and redacted excerpts may carry private context. Keep real scan evidence private. The public examples use only synthetic `fixture:` tags and abstract records; actual scanner controls use reserved-domain contacts, not credential-shaped test strings.
 
-## Finite consumption
+## How allowance is consumed
 
 For each eligible current occurrence, in the scanner's returned order:
 
@@ -99,7 +103,7 @@ An isolated installation outside the checkout reproduces every new report throug
 
 Original implementation and synthetic controls; no external code or data copied. Finite baseline counts and occurrence disambiguation are established approaches, not new methods.
 
-- [alint baseline mode](https://alint.org/docs/concepts/adoption/baseline/): recorded fingerprint counts as budgets, excess occurrences reported; incomplete-write refusal. alint also has accept-new/strict-stale guards that this extension does not implement. Its matching fields/output format differ.
+- [alint baseline mode](https://alint.org/docs/concepts/adoption/baseline/): recorded fingerprint counts as budgets, excess occurrences reported; incomplete-write refusal. alint also has accept-new/strict-baseline guards that this extension does not implement. Its matching fields/output format differ.
 - [Semgrep findings in CI](https://docs.semgrep.dev/semgrep-ci/findings-ci): rule/path/context/index disambiguates repeated identical findings. This extension is a simpler quota, not Semgrep's repository-history/diff-aware analysis.
 - [Semgrep duplicate finding identities](https://docs.semgrep.dev/semgrep-code/remove-duplicates): indexed fingerprints and line movement. Their identity details can change; no compatibility is claimed.
 - [MongoDB Kingfisher baseline management](https://mongodb.github.io/kingfisher/usage/baseline/): explicit repository scoping, complete-scan updates and atomic replacement. This extension does not have repository identity, history, multi-worker merging or automatic pruning.
