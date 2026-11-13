@@ -4,7 +4,15 @@ Local-first prompt linting with a full-stage baseline and CI-gate witness.
 
 [Interactive policy inspector](https://midya8.github.io/promptguard/) | [Definitions and reproduction](EVIDENCE.md) | [Original README](docs/original-readme.md)
 
-## Silence is not a clean scan
+## Scanning, policy replay and occurrence quotas
+
+The scanner finds deterministic patterns in local files. The original policy
+inspector replays filtering, set-baseline suppression and gate decisions on
+synthetic finding records. The opt-in quota mode limits suppression by a
+declared occurrence count and has a separate inspector. Neither inspector
+measures how well the scanner detects sensitive material or attacks.
+
+## Full-stage scan reports
 
 A finding can disappear at the severity filter or baseline before a gate sees it. PromptGuard now records every current finding, its SHA-256 identity, eligibility, baseline match, disposition, reported payload, and final gate decision. The browser independently recomputes bounded synthetic finding records using JavaScript and WebCrypto. It does not scan prompts, call a model, or measure detection effectiveness.
 
@@ -33,7 +41,7 @@ bash tools/wheel_smoke.sh
 bash examples/demo.sh
 ```
 
-87 Python tests include 13,320 exhaustive small policy controls. Independent JavaScript checks compare all 27 reports (735 numeric and 1,443 other leaves). Actual Chrome checks every displayed row, fingerprint table, gate field, selected full record, export and stage mark: 50 current rows, 17 prior rows, 16 unique baseline entries across cases, 50 full records and 181 circles. Mobile containment is checked at 320, 390 and 1280 pixels. The isolated wheel checks all 27 reports and eight installed module origins outside the checkout.
+The original full-stage release had 87 Python tests, including 13,320 exhaustive small policy controls. Independent JavaScript checks compare all 27 reports (735 numeric and 1,443 other leaves). Actual Chrome checks every displayed row, fingerprint table, gate field, selected full record, export and stage mark: 50 current rows, 17 prior rows, 16 unique baseline entries across cases, 50 full records and 181 circles. Mobile containment is checked at 320, 390 and 1280 pixels. The isolated wheel checks all 27 reports and eight installed module origins outside the checkout.
 
 ---
 
@@ -43,9 +51,9 @@ Local-first prompt, secret and prompt-injection linting for AI systems.
 
 PromptGuard scans prompt, Markdown, JSON and YAML files for credential material (including OpenAI, AWS, GitHub, Slack and Google tokens and JWTs), personal data, prompt-injection patterns and missing prompt metadata. It produces redacted terminal output, machine-readable JSON, SARIF 2.1.0 output for code-scanning tools, JUnit XML for CI test viewers, Markdown reports for CI job summaries, and a standalone escaped HTML report. It is dependency-free and works offline, so it can run in local checks and CI without sending prompts or secrets to a service.
 
-## Why
+## Scanner checks
 
-Prompt files are production configuration. They often mix instructions, examples, tool policies and user data, but they rarely get the same review discipline as application code. PromptGuard turns common AI-security review checks into a repeatable gate:
+The offline scanner applies pattern and metadata checks:
 
 - finds OpenAI-style keys, AWS-style keys, private key headers and assigned secrets;
 - finds email addresses, phone numbers and payment-card numbers with Luhn validation;
@@ -143,11 +151,11 @@ The test suite runs fully offline. CI runs the same checks on Python 3.10 throug
 - **Redaction by default:** findings preserve enough context for review without copying full credentials into reports.
 - **Actionable output:** every finding carries a rule ID, severity, file, line, message and redacted excerpt; SARIF output maps findings to code-scanning rule metadata and locations; JUnit XML exposes findings to ordinary CI test viewers; Markdown summaries fit native CI job-summary surfaces with escaped table cells.
 - **Scriptable gates:** severity and finding-count thresholds provide meaningful CI exit codes.
-- **Safe reports:** HTML output escapes file paths, messages and excerpts and needs no JavaScript; JUnit XML is serialized with standard-library XML escaping.
+- **Escaped reports:** HTML output escapes file paths, messages and excerpts and needs no JavaScript; JUnit XML is serialized with standard-library XML escaping.
 
 
 ## Opt-in occurrence quotas
 
 A separate actual-scanner baseline mode suppresses at most the declared occurrence count. Exact path, severity, rule and material/content identity are bound; the original v1 set baseline and scanner patterns stay unchanged. One declared allowance suppresses one of three equal-identity occurrences, while the legacy set suppresses all three. Every consumption, unused entry and gate decision is visible in the [quota inspector](https://midya8.github.io/promptguard/quota.html).
 
-100 Python tests retain all87 originals; seven Node/actual-Chrome tests retain allthree originals.4,374 exhaustive occurrence-rank controls and200 seeded full native/browser comparisons;24 complete reports,52currentrows32priorrows22entries104SVGmarks, trusted downloads/native replay and isolated API/module/console reproduction. Equal-identity rows remain interchangeable, not historically tracked; exact paths are not repository IDs. Manual quotas, hashes and passing gates are not safety or authorization. [Contract, limits, sources and reproduction](QUOTAS.md).
+The current suite has 100 Python tests, including all 87 earlier tests, and seven Node/actual-Chrome tests, including all three earlier tests. Quota checks cover 4,374 exhaustive occurrence-rank controls and 200 seeded full native/browser comparisons. The 24 complete reports contain 52 current rows, 32 prior rows, 22 entries and 104 SVG marks. Checks include trusted downloads, native replay and isolated API/module/console reproduction. Equal-identity rows remain interchangeable, not historically tracked; exact paths are not repository IDs. Manual quotas, hashes and passing gates are not safety or authorization. [Contract, limits, sources and reproduction](QUOTAS.md).
